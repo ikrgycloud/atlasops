@@ -1,0 +1,18 @@
+groups:
+  - name: atlasops
+    rules:
+      - alert: AtlasOpsUnavailable
+        expr: up{job="atlasops"} == 0
+        for: 2m
+        labels: {severity: critical}
+        annotations: {summary: AtlasOps API scrape is unavailable}
+      - alert: AtlasOpsAPIErrors
+        expr: sum(rate(atlasops_http_requests_total{status=~"5.."}[5m])) > 0.1
+        for: 5m
+        labels: {severity: warning}
+        annotations: {summary: AtlasOps API error rate increased}
+      - alert: AtlasOpsJobsFailed
+        expr: atlasops_durable_jobs{status="FAILED"} > 0
+        for: 5m
+        labels: {severity: warning}
+        annotations: {summary: AtlasOps has terminal background-job failures}

@@ -1,0 +1,9 @@
+# Extending adapters
+
+Implement the appropriate Protocol in `atlasops.adapters.contracts`. Declare only tested `Capabilities`; unsupported operations raise `AdapterError("unsupported_operation")`. Configuration must validate before saving. Keep credentials behind `SecretProvider`, preserve TLS verification, bound retry/time/output/query scope, and normalize provider permission, rate-limit and transport errors to non-secret codes.
+
+Read-only adapters must not import or call execution handlers. The AI abstraction only emits `Finding`; no permission-bearing result is accepted. All diagnostic tools require strict schemas, current resource/environment authorization and an audit event. Adding Azure, Kubernetes or another provider must not change incident/approval authorization semantics.
+
+For a new mutation handler, first define a strict typed action plan and immutable canonical parameters, permission/risk policy, target scope, preconditions, time limit, independent verification, idempotency and reconciliation/recovery. Integrate it through the central proposal/approval service and worker. Add mandatory negative tests for unapproved, rejected, expired, changed/hash-mismatched, cross-target, unauthorized, concurrent and uncertain execution. A directory or Protocol implementation does not enable support: leave production capability disabled until real integration and recovery acceptance have been verified.
+
+Contract tests should use SDK Stubber or a local HTTP/SMTP service with labeled synthetic records. Then explicitly record live-system evidence when credentials are available. Never silently fall back to a fake success when a configured integration fails.

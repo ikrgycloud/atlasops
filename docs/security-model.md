@@ -1,0 +1,11 @@
+# Security model
+
+Production requires OIDC JWT validation (signature, issuer, audience, expiration) and a pre-provisioned user/membership. Development authentication is opt-in, requires an operator-provided secret, is rate-limited, and is prohibited in production. Tokens never imply a role: current membership is loaded on every request.
+
+Viewer: read operational data. Operator: read, create incidents, request investigations/proposals/reports, dispatch previously approved executions. Approver: read and decide low-risk sandbox plans. Administrator: these plus environment and integration registration, audit access, connector administration. Environment scope is enforced for reads and writes; out-of-scope object access is indistinguishable from missing objects. No secrets are returned by the API.
+
+Every mutation of infrastructure must pass the centralized proposal/approval/execution service. Only a database sandbox recovery operation is implemented. Production mutation capabilities are unsupported. Plans are canonicalized and hashed including tenant, environment, resource, parameters, and expiry. Approvals bind the exact hash, require a separate explicit decision, expire, and are consumed once under a database lock. The worker revalidates the approver's current membership and policy. Unknown outcomes enter reconciliation; infrastructure mutations are never automatically retried.
+
+Integration destinations must be explicitly allowed by the deployment operator, use TLS except opt-in local development, disallow redirects, bound timeouts and output size. Credentials are references to process secrets, never API values or database configuration. Webhook keys are per integration; signatures, event identifiers, replay records, and freshness are checked. GitHub has no native signed delivery timestamp; first-receipt replay protection has that residual limitation.
+
+Audit events are append-only through the API, but database administrators can alter storage. Use a dedicated runtime database role, deny UPDATE/DELETE on audit records, and export to externally retained append-only storage for stronger guarantees. No claim of tamper-proof logging is made. See threat-model.md and operations.md for deployment boundaries.

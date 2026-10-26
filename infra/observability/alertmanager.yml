@@ -1,0 +1,10 @@
+route:
+  receiver: local-only
+  group_by: [alertname]
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+receivers:
+  - name: local-only
+# Add a trusted HMAC-signing relay before forwarding to AtlasOps ingestion.
+# Native Alertmanager webhooks do not implement the application's signed relay contract.

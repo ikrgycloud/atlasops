@@ -1,0 +1,79 @@
+name: atlasops
+x-runtime: &runtime
+  image: atlasops-api
+  env_file: .env
+  environment:
+    ATLAS_DATABASE_URL: postgresql+psycopg://atlasops:${POSTGRES_PASSWORD}@db:5432/atlasops
+    ATLAS_REDIS_URL: redis://redis:6379/0
+  depends_on:
+    db: {condition: service_healthy}
+    redis: {condition: service_healthy}
+services:
+  db:
+    image: postgres:16.8-alpine@sha256:3b057e1c2c6dfee60a30950096f3fab33be141dbb0fdd7af3d477083de94166c
+    environment:
+      POSTGRES_USER: atlasops
+      POSTGRES_DB: atlasops
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Run python3 scripts/dev_env.py first}
+    ports: ["127.0.0.1:5432:5432"]
+    volumes: ["postgres-data:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U atlasops -d atlasops"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+  redis:
+    image: redis:7.4.2-alpine@sha256:02419de7eddf55aa5bcf49efb74e88fa8d931b4d77c07eff8a6b2144472b6952
+    command: ["redis-server", "--appendonly", "yes"]
+    ports: ["127.0.0.1:6379:6379"]
+    volumes: ["redis-data:/data"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+  api:
+    <<: *runtime
+    build: {context: ., dockerfile: backend/Dockerfile}
+    profiles: ["app"]
+    command: ["uvicorn", "atlasops.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    ports: ["127.0.0.1:8000:8000"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready')"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+  worker:
+    <<: *runtime
+    profiles: ["app"]
+    command: ["celery", "-A", "atlasops.worker:celery", "worker", "--concurrency=2", "--loglevel=INFO"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "from atlasops.worker import celery; import socket; result=celery.control.inspect(destination=['celery@'+socket.gethostname()],timeout=3).ping(); raise SystemExit(0 if result else 1)"]
+      interval: 20s
+      timeout: 8s
+      retries: 5
+      start_period: 15s
+  scheduler:
+    <<: *runtime
+    profiles: ["app"]
+    command: ["celery", "-A", "atlasops.worker:celery", "beat", "--schedule", "/tmp/celerybeat-schedule", "--loglevel=INFO"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import os; raise SystemExit(0 if b'beat' in open('/proc/1/cmdline','rb').read() and os.path.exists('/tmp/celerybeat-schedule') else 1)"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+  web:
+    image: atlasops-web
+    profiles: ["app"]
+    build: {context: ., dockerfile: frontend/Dockerfile}
+    ports: ["127.0.0.1:8080:8080"]
+    depends_on: [api]
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/health/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+volumes:
+  postgres-data:
+  redis-data:

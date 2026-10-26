@@ -1,0 +1,96 @@
+{
+  "title": "AtlasOps control plane",
+  "uid": "atlasops",
+  "schemaVersion": 40,
+  "version": 1,
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "API requests / second",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(atlasops_http_requests_total[5m]))"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "API latency p95",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95,sum by(le)(rate(atlasops_http_request_seconds_bucket[5m])))"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Durable jobs by status",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by(status)(atlasops_durable_jobs)"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Integration availability",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by(status)(atlasops_integrations)"
+        }
+      ]
+    }
+  ]
+}
