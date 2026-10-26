@@ -619,3 +619,36 @@ def test_repeated_diagnostic_cannot_create_an_infinite_loop(
     assert result["status"] == "FAILED"
     assert result["findings"]["error_code"] == "diagnostic_repeated_query"
     assert len(calls) == 2
+
+
+def test_deployment_only_investigation_reports_missing_log_evidence(client, identities, synthetic_incident):
+    incident_id = synthetic_incident("incomplete_telemetry")
+    a = identities["a"]
+    with transaction() as session:
+        session.add(
+            Deployment(
+                tenant_id=a["tenant"],
+                environment_id=a["environment"],
+                external_id="deployment-only-run",
+                provider="synthetic.github",
+                revision="test-revision",
+                workflow="synthetic-release",
+                status="success",
+                run_url="https://github.com/example/project/actions/runs/123",
+                observed_at=now(),
+            )
+        )
+    response = client.post(
+        f"/api/v1/incidents/{incident_id}/investigations", headers=a["operator"], json={"use_ai": False}
+    )
+    assert response.status_code == 202, response.text
+    process_job(response.json()["job_id"])
+    result = client.get(f"/api/v1/incidents/{incident_id}/investigations", headers=a["viewer"])
+    assert result.status_code == 200, result.text
+    findings = result.json()["items"][0]["findings"]
+    assert findings["sources"]["deployments"]["status"] == "available"
+    assert findings["sources"]["deployments"]["count"] == 1
+    assert findings["sources"]["logs"]["status"] == "missing"
+    assert findings["sources"]["logs"]["count"] == 0
+    assert findings["sources"]["logs"]["latest_observation"] is None
+    assert "logs: no authorized records in the investigation window" in findings["missing_data"]

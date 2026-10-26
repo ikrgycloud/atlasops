@@ -60,10 +60,20 @@ def _source_coverage(evidence):
             return [e for e in evidence if e["kind"] == "deployment"]
         if source == "observations":
             return [e for e in evidence if e["kind"] not in {"incident", "deployment"}]
-        key = {"metrics": "metric", "logs": "reference", "traces": "trace_id"}[source]
-        return [
-            e for e in evidence if key in e["data"] or (source == "logs" and "log_references" in e["data"])
-        ]
+        if source == "logs":
+            return [
+                e
+                for e in evidence
+                if e["kind"] == "log_reference"
+                or (
+                    e["kind"] not in {"incident", "deployment"}
+                    and isinstance(references := e["data"].get("log_references"), list)
+                    and references
+                    and all(isinstance(reference, str) and reference.strip() for reference in references)
+                )
+            ]
+        key = {"metrics": "metric", "traces": "trace_id"}[source]
+        return [e for e in evidence if key in e["data"]]
 
     return {
         source: {

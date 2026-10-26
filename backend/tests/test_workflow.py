@@ -1,12 +1,14 @@
 from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
 from datetime import timedelta
+from zoneinfo import ZoneInfo
 
 import pytest
 from fastapi import HTTPException
 from sqlalchemy import select
 
 from atlasops.actions import SandboxExecutor, execute, plan_hash, transition
+from atlasops.config import settings
 from atlasops.db import transaction
 from atlasops.jobs import process_job
 from atlasops.models import (
@@ -99,7 +101,10 @@ def test_end_to_end_alert_investigate_approve_execute_report(client, scenario):
     proposal = client.get(f"/api/v1/action-proposals/{s['proposal']['id']}", headers=s["a"]["viewer"]).json()
     assert proposal["state"] == "SUCCEEDED"
     report_job = client.post(
-        "/api/v1/reports/generate", headers=s["a"]["operator"], json={"day": now().date().isoformat()}
+        "/api/v1/reports/generate",
+        headers=s["a"]["operator"],
+        # Report dates are operational days, which may differ from the current UTC date.
+        json={"day": now().astimezone(ZoneInfo(settings().report_timezone)).date().isoformat()},
     )
     assert report_job.status_code == 202
     process_job(report_job.json()["job_id"])
