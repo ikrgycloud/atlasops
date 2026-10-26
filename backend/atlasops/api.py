@@ -43,6 +43,7 @@ from atlasops.schemas import (
     IncidentInput,
     IncidentTransition,
     IntegrationInput,
+    InvestigationInput,
     ProposalInput,
     ReportRequest,
 )
@@ -154,7 +155,10 @@ def incident_events(
 
 @router.post("/incidents/{incident_id}/investigations", status_code=202)
 def create_investigation(
-    incident_id: UUID, p: Principal = Depends(current_user), session: Session = Depends(get_session)
+    incident_id: UUID,
+    body: InvestigationInput | None = None,
+    p: Principal = Depends(current_user),
+    session: Session = Depends(get_session),
 ):
     p.require("operate")
     incident = scoped_get(session, Incident, str(incident_id), p)
@@ -163,7 +167,13 @@ def create_investigation(
     )
     session.add(row)
     session.flush()
-    job_id = enqueue(session, p, "investigate", {"investigation_id": row.id}, f"investigation:{row.id}")
+    job_id = enqueue(
+        session,
+        p,
+        "investigate",
+        {"investigation_id": row.id, "use_ai": body.use_ai if body else True},
+        f"investigation:{row.id}",
+    )
     audit(session, p, "investigation.requested", row)
     session.commit()
     return {"id": row.id, "job_id": job_id, "status": "PENDING"}

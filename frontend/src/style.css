@@ -1319,3 +1319,15 @@ details > pre {
     gap: 0;
   }
 }
+
+.investigation-mode {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11px;
+}
+.investigation-mode input {
+  width: 15px;
+  height: 15px;
+  accent-color: #75e3bd;
+}

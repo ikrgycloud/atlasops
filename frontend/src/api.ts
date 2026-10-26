@@ -14,6 +14,12 @@ export type Me = {
   tenant_name: string;
   demo: boolean;
   ai_available: boolean;
+  ai_status?: {
+    available: boolean;
+    reason: string | null;
+    provider: string;
+    response_format: string;
+  };
 };
 export type Page<T> = {
   items: T[];
@@ -81,6 +87,24 @@ export type Finding = {
   }[];
   evidence: Evidence[];
   error_code?: string;
+  planner?: {
+    iterations: number;
+    tool_calls: number;
+    max_iterations: number;
+    max_tool_calls: number;
+    termination_reason: string;
+    elapsed_seconds: number;
+  };
+  sources?: Record<
+    string,
+    {
+      status: string;
+      count: number;
+      latest_observation: string | null;
+      capability: string;
+    }
+  >;
+  evidence_partial?: boolean;
 };
 export type Investigation = {
   id: string;

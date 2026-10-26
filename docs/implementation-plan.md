@@ -16,3 +16,7 @@ The repository was empty (unborn local branch; the remote advertised no refs). T
 PostgreSQL is the business-state authority. Redis/Celery only dispatch durable database jobs. API and workers run independently. Configuration comes from validated environment variables. All integration URLs are administrator-controlled and constrained by an operator allowlist. No arbitrary command, SQL, or general cloud-mutation tool is exposed. Sandbox remediation changes only a dedicated database sandbox resource. Missing paid/external credentials do not block the core workflow.
 
 Implement complete vertical slices in the above order. Preserve user files. Update implementation-status.md with actual executed checks and limitations; distinguish test doubles from live integrations.
+
+## Mandatory OpenAI extension
+
+Add a masked local dotenv credential without changing compatible-provider selection; bind it to the official TLS endpoint; configure model capabilities explicitly. Replace the single-request worker path with a bounded, audited planner over the registered read-only diagnostics. Preserve approval/hash/sandbox policy. Gate: mocked OpenAI success/error/security tests, five synthetic incident scenarios, budget/authorization/recovery tests, existing approval regressions, browser evidence-only mode/coverage UI, build/lint/format/migration checks, and accurate live-versus-mocked documentation. No live key is requested or embedded.

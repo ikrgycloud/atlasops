@@ -1,6 +1,6 @@
 # Configuration and integrations
 
-All runtime settings use the `ATLAS_` prefix; `.env.example` lists them. The API validates settings at startup. Secret references must match `ATLAS_SECRET_[A-Z0-9_]+`; references resolve from the server's injected environment, never from request values, frontend bundles or database-stored credential values. Use a managed secret injector in production. Rotating a binding and restarting API/workers changes future adapter calls. Stored integration metadata never contains raw credentials.
+Most runtime settings use the `ATLAS_` prefix; local `OPENAI_API_KEY` is an explicit secret-aware exception; `.env.example` lists them. The API validates settings at startup. Secret references must match `ATLAS_SECRET_[A-Z0-9_]+`; references resolve from the server's injected environment, never from request values, frontend bundles or database-stored credential values. Use a managed secret injector in production. Rotating a binding and restarting API/workers changes future adapter calls. Stored integration metadata never contains raw credentials.
 
 `ATLAS_INTEGRATION_HOSTS` is an exact hostname allowlist, without schemes or paths. HTTPS is required; local HTTP additionally requires development mode and `ATLAS_ALLOW_INSECURE_INTEGRATIONS=true`. Requests do not follow redirects, use bounded timeouts and cap responses at 1 MiB. Also enforce destination/IP restrictions at the deployment egress proxy to address DNS rebinding and compromised allowed endpoints. Keep the hostname allowlist small. Private services are not prohibited if explicitly authorized by the operator.
 
@@ -14,7 +14,7 @@ All runtime settings use the `ATLAS_` prefix; `.env.example` lists them. The API
 | GitHub Actions | Latest 100 run records and signed workflow_run ingestion | Repository scope, optional fine-grained read token; webhook signing reference | Local HTTP double and signed fixture tests |
 | Jenkins | Last build for up to 100 jobs, signed relay event ingestion | Optional username/token reference | Local HTTP double; relay fixture contract |
 | SMTP | Text report delivery with STARTTLS and deterministic Message-ID | Optional username/secret reference; destination allowlist | Local SMTP server and failure/retry tests |
-| Compatible AI | Structured investigation findings; no mutation tools | Configurable HTTPS base URL/model, optional bearer reference | Output/schema/security tests; live model unconfigured |
+| Compatible AI / OpenAI | Bounded multi-step investigations and read-only diagnostics | Configurable model/output mode, local masked OpenAI key or compatible bearer reference | Mocked HTTP, synthetic API/job scenarios and security tests; live call unverified |
 | Linux connector | CPU load, memory, disk, configured systemd status, log **references** | Outbound high-entropy scoped bearer credential over TLS | API replay/scope/rotation/revocation tests; local Linux diagnostics |
 | Sandbox execution | `sandbox.recover` only | Exact plan-bound human approval and current RBAC | PostgreSQL concurrency and end-to-end browser tests |
 
@@ -36,11 +36,9 @@ Alertmanager bodies follow its `alerts` list format, with labels, annotations.su
 
 ## Investigation and AI
 
-Set `ATLAS_AI_URL` to an operator-allowed OpenAI-compatible base URL, `ATLAS_AI_MODEL` to a model selected by the operator, and optionally `ATLAS_AI_SECRET_REF` to an injected secret name. The request uses `/chat/completions` and JSON-schema output. No model name or credential is hard-coded. Live provider compatibility must be verified for your selected model.
+See [OpenAI and bounded AI investigation](openai.md) for the complete current configuration, explicit model capabilities, immutable read-only registry, enforced limits, correlation/coverage behavior, privacy, live verification and error handling. `OPENAI_API_KEY` is loaded as a masked `SecretStr` from the ignored local `.env`; compatible providers retain `ATLAS_AI_SECRET_REF`. No model is hard-coded. Current structured provider verification is mocked; no live call is claimed without an operator-configured key/model.
 
-The diagnostic registry exposes only `evidence.read`: an authorized incident, timezone-aware window of at most two hours, at most 50 records, and an audit entry. No execution capability is available to the model. Findings validate evidence IDs, classification, confidence, hypotheses and missing evidence. A probable/confirmed claim requires multiple existing evidence references, but schema validation does not prove a root cause; humans must assess the supporting and contradicting data. External text cannot approve an action. Without AI, evidence collection completes with `AI_UNAVAILABLE` and explicit uncertainty.
-
-Current correlation is bounded by tenant/environment/time; a complete service dependency graph, deep trace fetching, autonomous multi-step queries, historical risk prediction and SLO policy configuration remain future work. Raw logs and customer request bodies are not ingested into the operational database.
+The backend planner can request additional scoped reads from incident, observation/metric, deployment, log-reference and trace-reference records. It records missing sources, validates all evidence IDs and enforces iteration/tool/window/output/deadline limits. No LLM tool can approve, execute, change policy or run arbitrary code. Production-changing handlers remain disabled.
 
 ## Linux connector
 

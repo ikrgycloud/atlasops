@@ -47,9 +47,11 @@ def jwks_client():
 
 
 def resolve_principal(session: Session, user_id: str, tenant_id: str) -> Principal:
-    user = session.get(User, user_id)
+    user = session.scalar(select(User).where(User.id == user_id).execution_options(populate_existing=True))
     membership = session.scalar(
-        select(Membership).where(Membership.user_id == user_id, Membership.tenant_id == tenant_id)
+        select(Membership)
+        .where(Membership.user_id == user_id, Membership.tenant_id == tenant_id)
+        .execution_options(populate_existing=True)
     )
     if not user or not user.active or not membership or membership.role not in PERMISSIONS:
         raise HTTPException(403, "No active tenant membership")

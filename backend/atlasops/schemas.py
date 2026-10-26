@@ -140,3 +140,7 @@ class ConnectorObservation(StrictModel):
 
 class ReportRequest(StrictModel):
     day: str | None = Field(default=None, pattern=r"^\d{4}-\d{2}-\d{2}$")
+
+
+class InvestigationInput(StrictModel):
+    use_ai: bool = True

@@ -8,7 +8,6 @@ from sqlalchemy.dialects.postgresql import insert
 from atlasops.access import audit, scoped_get
 from atlasops.actions import execute, transition
 from atlasops.adapters.contracts import AdapterError
-from atlasops.adapters.registry import ai_provider
 from atlasops.auth import resolve_principal
 from atlasops.db import transaction
 from atlasops.incidents import event
@@ -24,7 +23,6 @@ from atlasops.models import (
     now,
 )
 from atlasops.reporting import deliver_report, generate_report
-from atlasops.schemas import Finding
 
 
 def enqueue(session, principal, kind: str, payload: dict, key: str):
@@ -53,6 +51,7 @@ def process_job(job_id: str):
             return
         job.status, job.started_at, job.attempts = "RUNNING", now(), job.attempts + 1
         kind, payload, tenant_id = job.kind, job.payload, job.tenant_id
+    investigation_error = None
     try:
         if kind == "execute":
             result = execute(payload["proposal_id"], payload["actor_id"], tenant_id)
@@ -67,54 +66,32 @@ def process_job(job_id: str):
                         session, Investigation, payload["investigation_id"], principal, for_update=True
                     )
                     incident = scoped_get(session, Incident, investigation.incident_id, principal)
-                    from atlasops.diagnostics import EvidenceQuery, run_diagnostic
+                    from atlasops.investigation import investigate
 
-                    evidence = run_diagnostic(
-                        session,
-                        principal,
-                        EvidenceQuery(
-                            incident_id=incident.id,
-                            start=max(
-                                incident.first_observed_at - timedelta(minutes=30), now() - timedelta(hours=2)
-                            ),
-                            end=now(),
-                        ),
-                    )
-                    from atlasops.config import settings
-
-                    if settings().ai_url:
-                        finding = ai_provider().investigate(evidence)
-                        investigation.status = "COMPLETED"
-                    else:
-                        finding = Finding(
-                            classification="insufficient_evidence",
-                            confidence=0,
-                            summary="AI investigation is unavailable. Authorized evidence has been collected for human review.",
-                            evidence_ids=[e["id"] for e in evidence],
-                            missing_data=[
-                                "No AI provider configured",
-                                "Correlated traces and dependency evidence required",
-                            ],
-                            next_queries=[
-                                "Compare deployment revision with error-rate and latency observations"
-                            ],
-                        )
-                        investigation.status = "AI_UNAVAILABLE"
-                    investigation.findings = {
-                        **finding.model_dump(),
-                        "evidence": evidence,
-                        "window_start": (incident.first_observed_at - timedelta(minutes=30)).isoformat(),
-                        "window_end": now().isoformat(),
-                    }
+                    outcome = investigate(session, principal, incident, use_ai=payload.get("use_ai", True))
+                    investigation.status = outcome.status
+                    investigation.findings = outcome.as_dict()
+                    if outcome.status in {"FAILED", "BUDGET_EXHAUSTED"}:
+                        investigation_error = outcome.error_code
                     incident.status = "INVESTIGATING"
                     event(
                         session,
                         incident,
                         "investigation",
                         "Evidence collection completed",
-                        {"investigation_id": investigation.id},
+                        {
+                            "investigation_id": investigation.id,
+                            "status": outcome.status,
+                            "error_code": outcome.error_code,
+                        },
                     )
-                    audit(session, principal, "investigation.completed", investigation)
+                    audit(
+                        session,
+                        principal,
+                        "investigation.failed" if investigation_error else "investigation.completed",
+                        investigation,
+                        {"status": outcome.status, "error_code": outcome.error_code},
+                    )
                 elif kind == "report":
                     report = generate_report(session, principal, payload.get("day"))
                     audit(session, principal, "report.generated", report)
@@ -169,11 +146,17 @@ def process_job(job_id: str):
                 delivery = session.get(NotificationDelivery, payload["delivery_id"])
                 if delivery.status != "SENT":
                     raise AdapterError(delivery.error_code or "email_failed", retryable=True)
-            job.status, job.completed_at, job.error_code = "SUCCEEDED", now(), None
+            job.status, job.completed_at, job.error_code = (
+                ("FAILED" if investigation_error else "SUCCEEDED"),
+                now(),
+                investigation_error,
+            )
     except Exception as error:
         with transaction() as session:
             job = session.scalar(select(BackgroundJob).where(BackgroundJob.id == job_id).with_for_update())
-            retryable = isinstance(error, AdapterError) and error.retryable and kind != "execute"
+            retryable = (
+                isinstance(error, AdapterError) and error.retryable and kind not in {"execute", "investigate"}
+            )
             job.error_code = error.code if isinstance(error, AdapterError) else "job_failed"
             job.status = "RETRY" if retryable and job.attempts < 4 else "FAILED"
             job.available_at = now() + timedelta(seconds=min(300, 2**job.attempts * 5) + random.randint(0, 5))
@@ -207,6 +190,15 @@ def recover_stalled_jobs():
                     )
                     if execution:
                         execution.status = "RECONCILIATION_REQUIRED"
+            elif job.kind == "investigate":
+                job.status = "FAILED"
+                investigation = session.get(Investigation, job.payload["investigation_id"])
+                if investigation:
+                    investigation.status = "FAILED"
+                    investigation.findings = {
+                        "error_code": "investigation_interrupted",
+                        "summary": "The worker stopped during investigation. No automatic model retry was performed.",
+                    }
             else:
                 job.status = "RETRY" if job.attempts < 4 else "FAILED"
                 job.available_at = now()

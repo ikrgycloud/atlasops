@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Protocol
 
+from atlasops.ai_schemas import InvestigationStep
 from atlasops.schemas import Finding
 
 
@@ -56,6 +57,7 @@ class AIProvider(Protocol):
     capabilities: Capabilities
 
     def investigate(self, evidence: list[dict]) -> Finding: ...
+    def next_step(self, context: dict, *, deadline: float | None = None) -> InvestigationStep: ...
 
 
 class ExecutionAdapter(Protocol):

@@ -154,6 +154,9 @@ def login(body: DevLogin, request: Request, session: Session = Depends(get_sessi
 def me(p: Principal = Depends(current_user), session: Session = Depends(get_session)):
     user = session.get(User, p.user_id)
     tenant = session.get(Tenant, p.tenant_id)
+    from atlasops.adapters.ai import ai_configuration_status
+
+    ai_status = ai_configuration_status()
     return {
         "user_id": user.id,
         "email": user.email,
@@ -162,7 +165,8 @@ def me(p: Principal = Depends(current_user), session: Session = Depends(get_sess
         "environment_ids": p.environment_ids,
         "demo": tenant.demo,
         "tenant_name": tenant.name,
-        "ai_available": bool(settings().ai_url),
+        "ai_available": ai_status["available"],
+        "ai_status": ai_status,
     }
 
 

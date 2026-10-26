@@ -26,4 +26,10 @@ else:
         f.write(
             "ATLAS_INTEGRATION_HOSTS=127.0.0.1,localhost,prometheus,grafana\nATLAS_ALLOW_INSECURE_INTEGRATIONS=true\n"
         )
+        f.write(
+            "\n# Optional AI: enter a key locally; choose your model and its supported output mode.\n"
+            "OPENAI_API_KEY=\nATLAS_AI_PROVIDER=compatible\nATLAS_AI_URL=\nATLAS_AI_MODEL=\n"
+            "ATLAS_AI_ALLOWED_HOSTS=api.openai.com\nATLAS_AI_RESPONSE_FORMAT=json_schema\n"
+            "ATLAS_AI_TOKEN_PARAMETER=max_completion_tokens\n"
+        )
     print("Created private .env for local development. Do not commit it.")

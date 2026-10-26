@@ -28,6 +28,10 @@ Process control: `scripts/local_services.py start|stop|restart` using the virtua
 
 To run another synthetic scenario while preserving prior results, `seed-scenario` creates a new isolated demo tenant and prints its development identity metadata. Production-impacting deployment, restart, scaling and configuration operations return unsupported; they are not silently simulated.
 
+## OpenAI investigation
+
+Configure `OPENAI_API_KEY` privately in the ignored `.env`, select a model with `ATLAS_AI_MODEL`, and choose its supported output mode. Restart API/workers, then request an investigation from an incident. The backend enforces read-only diagnostic scope, iteration/tool/time/size budgets and evidence references; AI never approves execution. See [exact configuration, live workflow, privacy and troubleshooting](docs/openai.md). No live key is needed by the automated tests.
+
 ## Verification
 
 ```bash

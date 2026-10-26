@@ -751,6 +751,7 @@ export function IncidentDetails({ me }: { me: Me }) {
   const investigate = useAction(`/incidents/${id}/investigations`);
   const propose = useAction(`/incidents/${id}/proposals`, () => setOpen(false));
   const [open, setOpen] = useState(false);
+  const [useAI, setUseAI] = useState(true);
   return (
     <>
       <Link className="text-link back" to="/incidents">
@@ -779,11 +780,19 @@ export function IncidentDetails({ me }: { me: Me }) {
                 <div className="actions">
                   <button
                     className="secondary"
-                    onClick={() => investigate.mutate({})}
+                    onClick={() => investigate.mutate({ use_ai: useAI })}
                     disabled={investigate.isPending}
                   >
                     <Bot size={15} /> Collect & investigate
                   </button>
+                  <label className="investigation-mode">
+                    <input
+                      type="checkbox"
+                      checked={useAI}
+                      onChange={(event) => setUseAI(event.target.checked)}
+                    />
+                    Use configured AI provider
+                  </label>
                   <button
                     onClick={() => setOpen(true)}
                     disabled={!i.evidence.length}
@@ -824,6 +833,72 @@ export function IncidentDetails({ me }: { me: Me }) {
                                 {v.findings.evidence_ids?.length || 0} evidence
                                 references
                               </small>
+                            )}
+                            {v.findings.planner && (
+                              <div
+                                className="callout"
+                                aria-label="Investigation limits"
+                              >
+                                <strong>Bounded investigation</strong>
+                                <p>
+                                  {v.findings.planner.iterations}/
+                                  {v.findings.planner.max_iterations} model
+                                  iterations
+                                  {" · "}
+                                  {v.findings.planner.tool_calls}/
+                                  {v.findings.planner.max_tool_calls} read-only
+                                  queries
+                                  {" · "}
+                                  {v.findings.planner.elapsed_seconds}s
+                                </p>
+                                <small>
+                                  Outcome:{" "}
+                                  {v.findings.planner.termination_reason.replaceAll(
+                                    "_",
+                                    " ",
+                                  )}
+                                </small>
+                              </div>
+                            )}
+                            {v.findings.sources && (
+                              <details>
+                                <summary>Source coverage and freshness</summary>
+                                <div className="table-scroll">
+                                  <table>
+                                    <thead>
+                                      <tr>
+                                        <th>Source</th>
+                                        <th>Coverage</th>
+                                        <th>Records</th>
+                                        <th>Latest observation</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {Object.entries(v.findings.sources).map(
+                                        ([source, coverage]) => (
+                                          <tr key={source}>
+                                            <td>
+                                              {source}
+                                              <small className="row-id">
+                                                {coverage.capability}
+                                              </small>
+                                            </td>
+                                            <td>
+                                              <Badge value={coverage.status} />
+                                            </td>
+                                            <td>{coverage.count}</td>
+                                            <td>
+                                              {date(
+                                                coverage.latest_observation,
+                                              )}
+                                            </td>
+                                          </tr>
+                                        ),
+                                      )}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              </details>
                             )}
                             {v.findings.hypotheses?.map((h, index) => (
                               <div className="callout" key={index}>

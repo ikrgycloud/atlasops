@@ -2,7 +2,7 @@ from functools import lru_cache
 from typing import Literal
 from zoneinfo import ZoneInfo
 
-from pydantic import model_validator
+from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -33,6 +33,21 @@ class Settings(BaseSettings):
     ai_url: str = ""
     ai_model: str = ""
     ai_secret_ref: str = ""
+    # Explicit alias bypasses ATLAS_ for the standard local OpenAI variable.
+    openai_api_key: SecretStr = Field(default=SecretStr(""), validation_alias="OPENAI_API_KEY", repr=False)
+    ai_provider: Literal["compatible", "openai"] = "compatible"
+    ai_allowed_hosts: str = "api.openai.com"
+    ai_response_format: Literal["json_schema", "json_object", "text_json"] = "json_schema"
+    ai_token_parameter: Literal["max_completion_tokens", "max_tokens"] = "max_completion_tokens"
+    ai_max_output_tokens: int = Field(default=2500, ge=128, le=8000)
+    ai_max_iterations: int = Field(default=4, ge=1, le=8)
+    ai_max_tool_calls: int = Field(default=8, ge=3, le=16)
+    ai_max_query_window_seconds: int = Field(default=7200, ge=60, le=7200)
+    ai_max_evidence: int = Field(default=100, ge=3, le=200)
+    ai_max_context_bytes: int = Field(default=60000, ge=4096, le=128000)
+    ai_max_output_bytes: int = Field(default=32768, ge=1024, le=65536)
+    ai_request_timeout_seconds: float = Field(default=15, ge=1, le=20)
+    ai_max_elapsed_seconds: float = Field(default=60, ge=1, le=75)
     telemetry_ttl_seconds: int = 900
 
     @model_validator(mode="after")
